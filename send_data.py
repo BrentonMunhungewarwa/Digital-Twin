@@ -25,7 +25,7 @@ def send_data():
     pm1p0  = pm_base + random.uniform(-2, 2)
     pm2p5  = pm1p0 + 1
     pm4p0  = pm1p0 + 0
-    pm10p0 = pm + 2
+    pm10p0 = pm1p0 + 2
 
     voc = 3 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
     nox = 2 + 1.5 * max(cycle, 0) + random.uniform(-0.2, 0.2)
