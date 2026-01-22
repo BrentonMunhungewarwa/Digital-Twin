@@ -33,7 +33,7 @@ def send_data2():
 
     params = {
         "cmd": "add_sen55",
-        "sensor_id": 1C6920945B00,
+        "sensor_id": "1C6920945B00",
         "area": "wifi",
         "operator": "wifi",
         "cellid": "wifi",
