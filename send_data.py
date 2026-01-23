@@ -14,7 +14,7 @@ def day_fraction():
 def sin_cycle(phase_shift=0.0):
     return math.sin(2 * math.pi * (day_fraction() - phase_shift))
 
-def send_data3():
+def send_data4():
     cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
 
     temp = 20 + 5 * cycle + random.uniform(-0.3, 0.3)
@@ -160,3 +160,4 @@ if __name__ == "__main__":
     send_data()
     send_data2()
     send_data3()
+    send_data4()
