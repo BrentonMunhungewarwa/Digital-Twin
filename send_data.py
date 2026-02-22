@@ -1,269 +1,103 @@
 import requests
 import math
 import random
+import time
 from datetime import datetime, timezone
 
 URL = "https://sacaqm.web.cern.ch/dbwrite.php"
 
-SENSOR_ID = "004B122FD0F8"
+# --- persistent drift state ---
+sensor_state = {}
 
 def day_fraction():
     now = datetime.now(timezone.utc)
     return (now.hour + now.minute / 60) / 24.0
 
-def sin_cycle(phase_shift=0.0):
-    return math.sin(2 * math.pi * (day_fraction() - phase_shift))
-    
-def send_data6():
-    cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
+def daily_cycle():
+    return math.sin(2 * math.pi * (day_fraction() - 0.25))
 
-    temp = 20 + 3 * cycle + random.uniform(-0.3, 0.3)
-    humi = 50 - 10 * cycle + random.uniform(-1, 1)
-    co2  = 430 - 100 * cycle + random.uniform(-30, 30)
+def is_work_hours():
+    now = datetime.now(timezone.utc)
+    return 8 <= now.hour <= 18
 
-    pm_base = 7 + 10 * max(cycle, 0)
-    pm1p0  = pm_base + random.uniform(-2, 2)
-    pm2p5  = pm1p0 + 1
-    pm4p0  = pm1p0 + 2
-    pm10p0 = pm1p0 + 1.5
+def get_state(sensor_id):
+    if sensor_id not in sensor_state:
+        sensor_state[sensor_id] = {
+            "temp": 20 + random.uniform(-1, 1),
+            "co2": 420 + random.uniform(-20, 20),
+            "pm": 5 + random.uniform(0, 5)
+        }
+    return sensor_state[sensor_id]
 
-    voc = 5 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
-    nox = 2 + 3 * max(cycle, 0) + random.uniform(-0.2, 0.2)
+def simulate_sensor(sensor_id, profile):
+
+    state = get_state(sensor_id)
+    cycle = daily_cycle()
+    work = is_work_hours()
+
+    # --- slow drift (random walk) ---
+    state["temp"] += random.uniform(-0.05, 0.05)
+    state["co2"]  += random.uniform(-5, 5)
+    state["pm"]   += random.uniform(-0.2, 0.2)
+
+    # --- base values ---
+    temp = state["temp"] + 3 * cycle
+    humi = 50 - 8 * cycle + random.uniform(-2, 2)
+
+    # --- occupancy effect ---
+    if work:
+        co2 = state["co2"] + random.uniform(50, 200)
+        voc = 4 + random.uniform(1, 3)
+    else:
+        co2 = state["co2"]
+        voc = 2 + random.uniform(-0.5, 0.5)
+
+    # --- random pollution event ---
+    if random.random() < 0.05:  # 5% chance spike
+        spike = random.uniform(10, 40)
+        state["pm"] += spike
+        print("PM EVENT on", sensor_id)
+
+    pm1 = max(1, state["pm"])
+    pm2 = pm1 + random.uniform(0.5, 1.5)
+    pm4 = pm1 + random.uniform(1, 3)
+    pm10 = pm1 + random.uniform(2, 5)
+
+    nox = 1 + (2 if work else 0) + random.uniform(-0.3, 0.3)
 
     params = {
         "cmd": "add_sen55",
-        "sensor_id": "80F3DA558250",
-        "area": "wifi",
+        "sensor_id": sensor_id,
+        "area": profile,
         "operator": "wifi",
         "cellid": "wifi",
         "temp": round(temp, 2),
         "humi": round(humi, 2),
-        "pm1p0": round(pm1p0, 2),
-        "pm2p5": round(pm2p5, 2),
-        "pm4p0": round(pm4p0, 2),
-        "pm10p0": round(pm10p0, 2),
+        "pm1p0": round(pm1, 2),
+        "pm2p5": round(pm2, 2),
+        "pm4p0": round(pm4, 2),
+        "pm10p0": round(pm10, 2),
         "voc": round(voc, 2),
         "nox": round(nox, 2),
         "co2": int(co2)
     }
 
-    r = requests.get(URL, params=params, timeout=10)
-def send_data5():
-    cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
-
-    temp = 20 + 3 * cycle + random.uniform(-0.3, 0.3)
-    humi = 50 - 10 * cycle + random.uniform(-1, 1)
-    co2  = 430 - 100 * cycle + random.uniform(-30, 30)
-
-    pm_base = 7 + 10 * max(cycle, 0)
-    pm1p0  = pm_base + random.uniform(-2, 2)
-    pm2p5  = pm1p0 + 1
-    pm4p0  = pm1p0 + 2
-    pm10p0 = pm1p0 + 1.5
-
-    voc = 5 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
-    nox = 2 + 3 * max(cycle, 0) + random.uniform(-0.2, 0.2)
-
-    params = {
-        "cmd": "add_sen55",
-        "sensor_id": "80F3DA5544D4",
-        "area": "wifi",
-        "operator": "wifi",
-        "cellid": "wifi",
-        "temp": round(temp, 2),
-        "humi": round(humi, 2),
-        "pm1p0": round(pm1p0, 2),
-        "pm2p5": round(pm2p5, 2),
-        "pm4p0": round(pm4p0, 2),
-        "pm10p0": round(pm10p0, 2),
-        "voc": round(voc, 2),
-        "nox": round(nox, 2),
-        "co2": int(co2)
-    }
-
-    r = requests.get(URL, params=params, timeout=10)
-
-def send_data3():
-    cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
-
-    temp = 20 + 5 * cycle + random.uniform(-0.3, 0.3)
-    humi = 50 - 10 * cycle + random.uniform(-1, 1)
-    co2  = 430 - 100 * cycle + random.uniform(-30, 30)
-
-    pm_base = 2 + 10 * max(cycle, 0)
-    pm1p0  = pm_base + random.uniform(-2, 2)
-    pm2p5  = pm1p0 + 1
-    pm4p0  = pm1p0 + 0
-    pm10p0 = pm1p0 + 2
-
-    voc = 5 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
-    nox = 2 + 3 * max(cycle, 0) + random.uniform(-0.2, 0.2)
-
-    params = {
-        "cmd": "add_sen55",
-        "sensor_id": "80F3DA558028",
-        "area": "wifi",
-        "operator": "wifi",
-        "cellid": "wifi",
-        "temp": round(temp, 2),
-        "humi": round(humi, 2),
-        "pm1p0": round(pm1p0, 2),
-        "pm2p5": round(pm2p5, 2),
-        "pm4p0": round(pm4p0, 2),
-        "pm10p0": round(pm10p0, 2),
-        "voc": round(voc, 2),
-        "nox": round(nox, 2),
-        "co2": int(co2)
-    }
-
-    r = requests.get(URL, params=params, timeout=10)
-
-def send_data4():
-    cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
-
-    temp = 20 + 5 * cycle + random.uniform(-0.3, 0.3)
-    humi = 50 - 10 * cycle + random.uniform(-1, 1)
-    co2  = 430 - 100 * cycle + random.uniform(-30, 30)
-
-    pm_base = 4 + 10 * max(cycle, 0)
-    pm1p0  = pm_base + random.uniform(-2, 2)
-    pm2p5  = pm1p0 + 1
-    pm4p0  = pm1p0 + 0
-    pm10p0 = pm1p0 + 2
-
-    voc = 5 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
-    nox = 2 + 3 * max(cycle, 0) + random.uniform(-0.2, 0.2)
-
-    params = {
-        "cmd": "add_sen55",
-        "sensor_id": "80F3DA537F5C",
-        "area": "wifi",
-        "operator": "wifi",
-        "cellid": "wifi",
-        "temp": round(temp, 2),
-        "humi": round(humi, 2),
-        "pm1p0": round(pm1p0, 2),
-        "pm2p5": round(pm2p5, 2),
-        "pm4p0": round(pm4p0, 2),
-        "pm10p0": round(pm10p0, 2),
-        "voc": round(voc, 2),
-        "nox": round(nox, 2),
-        "co2": int(co2)
-    }
-
-    r = requests.get(URL, params=params, timeout=10)
-
-def send_data3():
-    cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
-
-    temp = 20 + 5 * cycle + random.uniform(-0.3, 0.3)
-    humi = 50 - 10 * cycle + random.uniform(-1, 1)
-    co2  = 430 - 100 * cycle + random.uniform(-30, 30)
-
-    pm_base = 2 + 10 * max(cycle, 0)
-    pm1p0  = pm_base + random.uniform(-2, 2)
-    pm2p5  = pm1p0 + 1
-    pm4p0  = pm1p0 + 0
-    pm10p0 = pm1p0 + 2
-
-    voc = 5 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
-    nox = 2 + 3 * max(cycle, 0) + random.uniform(-0.2, 0.2)
-
-    params = {
-        "cmd": "add_sen55",
-        "sensor_id": "80F3DA558028",
-        "area": "wifi",
-        "operator": "wifi",
-        "cellid": "wifi",
-        "temp": round(temp, 2),
-        "humi": round(humi, 2),
-        "pm1p0": round(pm1p0, 2),
-        "pm2p5": round(pm2p5, 2),
-        "pm4p0": round(pm4p0, 2),
-        "pm10p0": round(pm10p0, 2),
-        "voc": round(voc, 2),
-        "nox": round(nox, 2),
-        "co2": int(co2)
-    }
-
-    r = requests.get(URL, params=params, timeout=10)
-def send_data2():
-    cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
-
-    temp = 20 + 5 * cycle + random.uniform(-0.3, 0.3)
-    humi = 50 - 10 * cycle + random.uniform(-1, 1)
-    co2  = 430 - 100 * cycle + random.uniform(-30, 30)
-
-    pm_base = 2 + 10 * max(cycle, 0)
-    pm1p0  = pm_base + random.uniform(-2, 2)
-    pm2p5  = pm1p0 + 1
-    pm4p0  = pm1p0 + 0
-    pm10p0 = pm1p0 + 2
-
-    voc = 5 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
-    nox = 2 + 3 * max(cycle, 0) + random.uniform(-0.2, 0.2)
-
-    params = {
-        "cmd": "add_sen55",
-        "sensor_id": "1C6920945B00",
-        "area": "wifi",
-        "operator": "wifi",
-        "cellid": "wifi",
-        "temp": round(temp, 2),
-        "humi": round(humi, 2),
-        "pm1p0": round(pm1p0, 2),
-        "pm2p5": round(pm2p5, 2),
-        "pm4p0": round(pm4p0, 2),
-        "pm10p0": round(pm10p0, 2),
-        "voc": round(voc, 2),
-        "nox": round(nox, 2),
-        "co2": int(co2)
-    }
-
-    r = requests.get(URL, params=params, timeout=10)
-
-def send_data():
-    cycle = sin_cycle(phase_shift=0.25)  # peak mid-afternoon
-
-    temp = 20 + 5 * cycle + random.uniform(-0.3, 0.3)
-    humi = 50 - 10 * cycle + random.uniform(-1, 1)
-    co2  = 450 - 100 * cycle + random.uniform(-30, 30)
-
-    pm_base = 3 + 10 * max(cycle, 0)
-    pm1p0  = pm_base + random.uniform(-2, 2)
-    pm2p5  = pm1p0 + 1
-    pm4p0  = pm1p0 + 0
-    pm10p0 = pm1p0 + 2
-
-    voc = 3 + 2 * max(cycle, 0) + random.uniform(-0.3, 0.3)
-    nox = 2 + 1.5 * max(cycle, 0) + random.uniform(-0.2, 0.2)
-
-    params = {
-        "cmd": "add_sen55",
-        "sensor_id": SENSOR_ID,
-        "area": "wifi",
-        "operator": "wifi",
-        "cellid": "wifi",
-        "temp": round(temp, 2),
-        "humi": round(humi, 2),
-        "pm1p0": round(pm1p0, 2),
-        "pm2p5": round(pm2p5, 2),
-        "pm4p0": round(pm4p0, 2),
-        "pm10p0": round(pm10p0, 2),
-        "voc": round(voc, 2),
-        "nox": round(nox, 2),
-        "co2": int(co2)
-    }
-
-    r = requests.get(URL, params=params, timeout=10)
-
-    
-    print(datetime.utcnow().isoformat(), r.status_code, params)
+    try:
+        r = requests.get(URL, params=params, timeout=10)
+        print(datetime.utcnow().isoformat(), sensor_id, r.status_code)
+    except Exception as e:
+        print("Error:", e)
 
 if __name__ == "__main__":
-    send_data()
-    send_data2()
-    send_data3()
-    send_data4()
-    send_data5()
-    send_data6()
+
+    sensors = {
+        "004B122FD0F8": "office",
+        "1C6920945B00": "lab",
+        "80F3DA558028": "corridor",
+        "80F3DA537F5C": "meeting_room",
+        "80F3DA5544D4": "storage",
+        "80F3DA558250": "entrance"
+    }
+
+    for sid, profile in sensors.items():
+        simulate_sensor(sid, profile)
