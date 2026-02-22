@@ -96,7 +96,7 @@ if __name__ == "__main__":
         "80F3DA558028": "corridor",
         "80F3DA537F5C": "meeting_room",
         "80F3DA5544D4": "storage",
-        "80F3DA558250": "entrance"
+        "80F3DA558251": "entrance"
     }
 
     for sid, profile in sensors.items():
