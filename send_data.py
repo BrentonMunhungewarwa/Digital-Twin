@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 URL = "https://sacaqm.web.cern.ch/dbwrite.php"
 
-# --- persistent drift state ---
+# --- persistent drift state (updated) ---
 sensor_state = {}
 
 def day_fraction():
